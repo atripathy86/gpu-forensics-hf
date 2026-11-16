@@ -1,11 +1,18 @@
-# checkpoint-forensics
+# GPU Forensics for Hugging Face Models
+
+This repository is an `atripathy86` fork/adaptation of
+[macrogrants/checkpoint-forensics](https://github.com/macrogrants/checkpoint-forensics).
+The upstream MIT-licensed implementation and attribution are preserved. It
+provides the Philox reconstruction and the published five-model replay; this
+fork adds a read-only Hugging Face inspection/fingerprint CLI, structured JSON
+reports, and validation metadata.
 
 This is the code for my report, [Top Chinese Frontier AI Models Carry the Fingerprint of Export-Controlled NVIDIA Blackwell GPUs](https://unemploymentlabs.com/checkpoint-forensics).
 
 Almost every AI model carries a hidden signature of the GPU that created it. You can use this to check that yourself for five models from DeepSeek, Moonshot, MiniMax and Ant Group and it runs on a laptop in a few seconds.
 
-    pip install numpy scipy
-    python replay.py
+    uv sync
+    uv run python replay.py
 
 | Model | Seed | SMs | Rows matched | Median r | Seed+1 | Next best | GPU |
 |---|---|---|---|---|---|---|---|
@@ -16,6 +23,50 @@ Almost every AI model carries a hidden signature of the GPU that created it. You
 | Ling-3.1-flash-base | 3952 | 152 | 384/384 | 0.983436 | 0.0004 | 192 (0.025) | Blackwell GB200/GB300 |
 
 For each model it rebuilds the untouched embedding rows from the seed under every SM count from 16 to 256 and prints the one that matches. seed+1 is a control and next best is the runner-up SM count. V4-Flash is 461/469 because 8 of those rows got partly trained.
+
+## Setup and Hugging Face examples
+
+Install the locked environment with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv sync
+```
+
+Run the original five-model replay through that environment:
+
+```bash
+uv run python replay.py
+```
+
+Inspect a Hugging Face repository without executing model code:
+
+```bash
+uv run gpu-forensics inspect https://huggingface.co/bert-base-uncased
+```
+
+Fingerprint one of the pinned published model examples directly from its Hugging Face URL:
+
+```bash
+uv run gpu-forensics fingerprint \
+  https://huggingface.co/deepseek-ai/DeepSeek-V3-Base \
+  --output deepseek-v3-report.json
+uv run gpu-forensics validate deepseek-v3-report.json \
+  --output deepseek-v3-validated.json
+```
+
+Other pinned examples are available in `models.json`:
+
+```bash
+uv run gpu-forensics fingerprint https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash
+uv run gpu-forensics fingerprint https://huggingface.co/moonshotai/Kimi-K3
+uv run gpu-forensics fingerprint https://huggingface.co/MiniMaxAI/MiniMax-M3
+uv run gpu-forensics fingerprint https://huggingface.co/inclusionAI/Ling-3.1-flash-base
+```
+
+For a model not present in `models.json`, `inspect` reports the available metadata and
+`fingerprint` returns an explicit inconclusive result until a seed, initialization
+method, tensor positions, and suitable samples are available. Use `REFETCH=1 uv run
+python replay.py` to re-download and hash-check the pinned sample rows.
 
 ## How it works
 

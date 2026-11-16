@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpu-forensics-hf"
+version = "0.1.0"
+description = "GPU initialization-layout forensics for Hugging Face model weights"
+requires-python = ">=3.9"
+dependencies = ["numpy", "scipy"]
+
+[project.scripts]
+gpu-forensics = "gpu_forensics:main"
+
+[tool.setuptools]
+py-modules = ["gpu_forensics", "gpuid", "fetch"]
