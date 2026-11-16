@@ -2,3 +2,7 @@ __pycache__/
 
 .venv/
 *.json.tmp
+*.egg-info/
+fixtures/*.npy.tmp
+.ruff_cache/
+.pytest_cache/

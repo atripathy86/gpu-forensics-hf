@@ -4,13 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gpu-forensics-hf"
-version = "0.1.0"
+version = "0.2.0"
 description = "GPU initialization-layout forensics for Hugging Face model weights"
 requires-python = ">=3.9"
 dependencies = ["numpy", "scipy"]
 
-[project.scripts]
-gpu-forensics = "gpu_forensics:main"
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
 
 [tool.setuptools]
-py-modules = ["gpu_forensics", "gpuid", "fetch"]
+py-modules = ["gpuid", "fetch"]
+packages = ["gpu_forensics"]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["gpuid.py", "fetch.py", "replay.py", "gpu_check.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+markers = ["network: requires access to huggingface.co"]
+addopts = "-m 'not network'"
