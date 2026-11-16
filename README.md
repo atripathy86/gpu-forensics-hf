@@ -1,4 +1,11 @@
-# checkpoint-forensics
+# GPU Forensics for Hugging Face Models
+
+This repository is an `atripathy86` fork/adaptation of
+[macrogrants/checkpoint-forensics](https://github.com/macrogrants/checkpoint-forensics).
+The upstream MIT-licensed implementation and attribution are preserved. It
+provides the Philox reconstruction and the published five-model replay; this
+fork adds a read-only Hugging Face inspection/fingerprint CLI, structured JSON
+reports, and validation metadata.
 
 This is the code for my report, [Top Chinese Frontier AI Models Carry the Fingerprint of Export-Controlled NVIDIA Blackwell GPUs](https://unemploymentlabs.com/checkpoint-forensics).
 
