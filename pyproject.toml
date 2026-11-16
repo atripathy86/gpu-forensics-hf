@@ -14,7 +14,10 @@ dev = ["pytest>=8", "ruff>=0.6"]
 
 [tool.setuptools]
 py-modules = ["gpuid", "fetch"]
-packages = ["gpu_forensics"]
+packages = ["gpu_forensics", "gpu_forensics.search"]
+
+[tool.setuptools.package-data]
+"gpu_forensics.search" = ["*.c", "*.cu"]
 
 [tool.ruff]
 line-length = 120
