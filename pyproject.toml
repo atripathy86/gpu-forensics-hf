@@ -9,6 +9,9 @@ description = "GPU initialization-layout forensics for Hugging Face model weight
 requires-python = ">=3.9"
 dependencies = ["numpy", "scipy"]
 
+[project.scripts]
+gpu-forensics = "gpu_forensics.cli:main"
+
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
 
