@@ -1,0 +1,21 @@
+# Published checkpoint-forensics examples (known recipes)
+deepseek-ai/DeepSeek-V3-Base
+deepseek-ai/DeepSeek-V4-Flash
+moonshotai/Kimi-K3
+MiniMaxAI/MiniMax-M3
+inclusionAI/Ling-3.1-flash-base
+# Other open models
+Qwen/Qwen2.5-0.5B
+Qwen/Qwen2.5-7B
+allenai/OLMo-2-0425-1B
+allenai/OLMo-2-1124-7B
+HuggingFaceTB/SmolLM2-135M
+EleutherAI/pythia-160m
+openai-community/gpt2
+microsoft/phi-2
+deepseek-ai/DeepSeek-V2-Lite
+mistralai/Mistral-7B-v0.1
+ibm-granite/granite-3.0-2b-base
+bigscience/bloom-560m
+TheBloke/Llama-2-7B-GPTQ
+meta-llama/Llama-3.1-8B
