@@ -10,17 +10,36 @@ and the upstream [macrogrants/checkpoint-forensics](https://github.com/macrogran
 
 - Fork: `git@github.com:atripathy86/gpu-forensics-hf.git`
 - Upstream: `git@github.com:macrogrants/checkpoint-forensics.git`
-- Python: 3.12 virtual environment in `.venv/`
-- Dependencies: `numpy 2.5.5`, `scipy 1.18.1`
+- `uv`: 0.12.3
+- Environment: `.venv/` created and managed by `uv sync`
+- Dependencies: `numpy 2.5.5`, `scipy 1.18.1` from `uv.lock`
 - Samples: pinned `rows/` files validated against the SHA-256 hashes in `models.json`
 - Remote model code execution: none
+
+## Reproduction with uv
+
+From the repository root, recreate the locked environment and run every command
+through `uv`:
+
+```bash
+uv sync
+uv run python replay.py
+uv run gpu-forensics inspect https://huggingface.co/bert-base-uncased
+uv run gpu-forensics fingerprint https://huggingface.co/deepseek-ai/DeepSeek-V3-Base \
+  --output /tmp/deepseek-report.json
+uv run gpu-forensics validate /tmp/deepseek-report.json
+```
+
+The pinned model examples can be selected by URL as documented in `README.md`.
+`REFETCH=1 uv run python replay.py` re-fetches the pinned rows and verifies
+ their hashes.
 
 ## Upstream replay
 
 Command:
 
 ```text
-.venv/bin/python replay.py
+uv run python replay.py
 ```
 
 Observed output:
@@ -44,7 +63,9 @@ seed behavior, and runner-up examples also match the published reference.
 Known-model fingerprint command:
 
 ```text
-.venv/bin/python gpu_forensics.py fingerprint DeepSeek-V3-Base --output /tmp/deepseek-report.json
+uv run gpu-forensics fingerprint \
+  https://huggingface.co/deepseek-ai/DeepSeek-V3-Base \
+  --output /tmp/deepseek-report.json
 ```
 
 Relevant output:
@@ -66,7 +87,8 @@ The CLI delegates known-model reconstruction to the retained upstream
 `gpuid.py`/`fetch.py` implementation, so its result is numerically consistent
 with `replay.py`. It adds structured provenance and classification output.
 
-Generic inspection was also exercised against the public `bert-base-uncased`
+Generic inspection was also exercised with `uv run gpu-forensics inspect
+https://huggingface.co/bert-base-uncased` against the public `bert-base-uncased`
 repository. It read `config.json`, reported the `BertForMaskedLM`
 architecture, reported the missing safetensors index as a diagnostic, and
 returned `feasible: false` without executing remote code. This is the intended
@@ -75,7 +97,7 @@ safe/inconclusive behavior for models without a usable forensic input path.
 Validation of a saved report:
 
 ```text
-.venv/bin/python gpu_forensics.py validate /tmp/deepseek-report.json
+uv run gpu-forensics validate /tmp/deepseek-report.json
 ```
 
 The result records `held_out: false` because the published upstream samples
