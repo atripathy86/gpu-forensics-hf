@@ -1,6 +1,11 @@
 # Gap analysis and roadmap
 
 Date: 2026-11-16
+
+> **Status (v0.2.0):** Phases 0–5 are implemented in the `gpu_forensics/` package, and
+> Phases 6–7 have tooling (`tools/synthesize_fixtures.py`, `tests/test_fixtures.py`,
+> `tools/corpus.py`). See "Implementation status" at the end. The gap analysis below
+> describes the tree as it was at `81b1c47`.
 Scope: compares the current tree (`81b1c47`) against `docs/init.md` and `docs/PLAN.md`, then lays out what to build next.
 
 ## 1. Verdict
@@ -151,3 +156,27 @@ tests/
 - **G equivalence classes are not unique to a vendor or product.** The report wording must not claim a specific GPU, only "layout compatible with …".
 - **Ethics and wording.** The upstream report makes export-control claims. This tool should report layout evidence and confidence, and leave the attribution conclusions to the reader.
 
+## 5. Implementation status (v0.2.0)
+
+| Phase | Status | Where |
+|---|---|---|
+| 0 Correctness/hygiene | Done. URL forms, SHA pinning, single-file checkpoints, real held-out split, bounded `inspect`, pytest/ruff/CI | `hub.py`, `engine.py`, `tests/`, `.github/workflows/ci.yml` |
+| 1 Inspect | Done. Safetensors headers via range reads, model-card/config/README hints, tokenizer padding and reserved ids, blockers (pickle, quantized embedding, adapters, gated repos), warnings (merged, derived, tied, `auto_map`), verdict | `inspector.py` |
+| 2 Sampler | Done. Tokenizer candidates plus a head/tail/coarse scan; isolated std clusters (smallest first, alternates kept) with mean and kurtosis filters; coalesced range reads, SHA-256 provenance, on-disk cache. Blind selection finds the init rows of all five published models | `sampler.py` |
+| 3 Hypothesis space | Done. `G` = SMs × threads/SM (1024/1536/2048), device catalogue and equivalence classes, `uniform_`, exact bf16 `trunc_normal_` (Ling r 0.983 → 0.99999), dtype casts, Philox offsets and an offset-increment model, TP and seed-per-rank | `layouts.py`, `recipes.py` |
+| 4 Seed discovery | Done. Explicit, `models.json`, metadata and conventions, then exhaustive native sign-pattern search (OpenMP; NumPy fallback; CUDA experimental), resumable, with a budget | `search/` |
+| 5 Statistics | Done. Fit/held-out split, pooled wrong-seed null with p and z, runner-up and indistinguishable layouts, Fisher z, bit-exact fraction, documented rules, versioned JSON | `stats.py`, `report.py` |
+| 6 Ground truth | Tooling ready, **not yet run**: generation on the local GB10 is deferred by request | `tools/synthesize_fixtures.py`, `tests/test_fixtures.py` |
+| 7 Corpus | Done for screening: 19 models; 6 supported, including DeepSeek-V2-Lite (A100-compatible) and Mistral-7B-v0.1 (H100-compatible) outside the published set. See `docs/report.md` | `tools/corpus.py`, `tools/corpus.txt` |
+
+Deviations from the plan:
+- **Hub access.** It uses `urllib` with `HF_TOKEN` rather than `huggingface_hub`, which keeps the project to two dependencies (numpy and scipy). Tests stub one function.
+- **Upstream scripts.** `replay.py` and the other upstream scripts are kept verbatim for provenance, rather than refactored to import the package.
+- **Seed search.** It needed no GPU: the CPU covers 2³² seeds × 18 layouts in about 10 minutes.
+
+Remaining work:
+- Run the fixtures on A100, H100, B200 and GB10 hardware.
+- Validate the CUDA backend.
+- Predict offsets automatically from module init order (currently `--offsets` or an explicit-seed offset scan).
+- Run `--seed search` across the inconclusive corpus models.
+- Search seeds wider than 32 bits.
