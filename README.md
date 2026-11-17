@@ -1,33 +1,26 @@
-# GPU Forensics for Hugging Face Models
-
-This repository is a fork of [checkpoint-forensics](https://github.com/macrogrants/checkpoint-forensics),
-the code for the report [Top Chinese Frontier AI Models Carry the Fingerprint of Export-Controlled NVIDIA Blackwell GPUs](https://unemploymentlabs.com/checkpoint-forensics).
-The original project reproduces the GPU fingerprints of five published models from
-recorded seeds and rows. Its files (`gpuid.py`, `fetch.py`, `replay.py`,
-`gpu_check.py`, `models.json`, `rows/`) are kept unchanged, and its README is
-reproduced in full [below](#the-original-checkpoint-forensics-replay).
-
-**What is new in this fork** is `gpu-forensics`, a tool that applies the method to
-any Hugging Face model:
-
-- **Inspection.** Takes any model URL or ID, pins it to a commit, and reads only metadata and safetensors byte ranges. It never executes repository code and reports whether analysis is feasible.
-- **Row selection.** Finds untrained embedding rows automatically, from tokenizer evidence and per-row statistics, so no hand-picked row list is needed.
-- **Seed discovery.** Tries metadata, published and conventional seeds, then runs an exhaustive, resumable 2³² search: about 10 minutes on a 20-core CPU.
-- **Broader layout model.** Models the launch grid as SMs × threads per SM (1024, 1536 or 2048) rather than assuming 2048, and reconstructs `normal_`, `uniform_` and `trunc_normal_` exactly. This includes the bf16 rounding path that previously limited Ling to r 0.98, Philox offsets, tensor-parallel shards, and fp32-vs-bf16 init.
-- **Validation.** Scores rows held out from fitting against wrong-seed and wrong-layout alternatives, and classifies the result as `supported`, `weak` or `inconclusive`.
-- **Reports and tests.** Writes reproducible JSON reports with full provenance, and ships an offline test suite and CI.
-- **New results.** Beyond the five published models, a corpus run found DeepSeek-V2-Lite (A100/A800-compatible layout) and Mistral-7B-v0.1 (H100/H800/H200-compatible layout); see [Results](#results-on-published-models).
-
-## The original checkpoint-forensics replay
+# checkpoint-forensics
 
 This is the code for my report, [Top Chinese Frontier AI Models Carry the Fingerprint of Export-Controlled NVIDIA Blackwell GPUs](https://unemploymentlabs.com/checkpoint-forensics).
 
 Almost every AI model carries a hidden signature of the GPU that created it. You can use this to check that yourself for five models from DeepSeek, Moonshot, MiniMax and Ant Group and it runs on a laptop in a few seconds.
 
+This repository extends the replay of [checkpoint-forensics](https://github.com/macrogrants/checkpoint-forensics)
+with the **[`gpu-forensics` CLI](#gpu-forensics-cli)**, which runs the same
+analysis on any Hugging Face model. It finds untrained rows automatically,
+recovers unknown seeds, validates on held-out rows and writes JSON reports.
+
+- [Replay of the published models](#replay-of-the-published-models)
+- [How it works](#how-it-works)
+- [On a real GPU](#on-a-real-gpu)
+- [Notes](#notes)
+- [gpu-forensics CLI](#gpu-forensics-cli): [commands](#commands), [classification rules](#classification-rules), [results](#results-on-published-models)
+
+## Replay of the published models
+
     pip install numpy scipy
     python replay.py
 
-or, with the locked environment in this repository: `uv sync && uv run python replay.py`.
+With uv: `uv sync && uv run python replay.py`.
 
 | Model | Seed | SMs | Rows matched | Median r | Seed+1 | Next best | GPU |
 |---|---|---|---|---|---|---|---|
@@ -39,7 +32,7 @@ or, with the locked environment in this repository: `uv sync && uv run python re
 
 For each model it rebuilds the untouched embedding rows from the seed under every SM count from 16 to 256 and prints the one that matches. seed+1 is a control and next best is the runner-up SM count. V4-Flash is 461/469 because 8 of those rows got partly trained.
 
-### How it works
+## How it works
 
 PyTorch's CUDA `normal_` launches 2,048 threads per SM and every thread gets its own Philox stream. Element `i` is written by thread `i mod G` where `G = 2048 × SMs`. A seed gives the same numbers on any GPU but they end up in different positions depending on the SM count.
 
@@ -54,7 +47,7 @@ Embedding rows for tokens that never appear in training never get a gradient so 
 
 The seeds were brute forced over all 2^32 values.
 
-### On a real GPU
+## On a real GPU
 
     python gpu_check.py
 
@@ -68,21 +61,37 @@ Same check with stock PyTorch (`torch.cuda.manual_seed` then `normal_`) so nothi
 
 Seed+1 matched nothing on any of them.
 
-### Notes
+## Notes
 
 - `rows/` is the rows copied from Hugging Face, 7 MB total. `REFETCH=1 python replay.py` downloads them again from the pinned revisions. They get checked against the hashes in `models.json` either way.
 - This is the GPU that created the starting weights. It doesn't say where the training happened after that.
 - H100, H800 and H200 are all 132 SMs. GB200 and GB300 are both 152 and so is an AMD MI300X in two-way partition mode. A stock MI300X is 304.
-- Ling uses `trunc_normal_` and our model of the bf16 path only gets to r 0.98.
-  (`replay.py` is unchanged; the `gpu-forensics` tool below models PyTorch's bf16 `uniform_` path exactly and reaches r ≈ 0.99999 on Ling.)
+- Ling uses `trunc_normal_` and our model of the bf16 path only gets to r 0.98. The [`gpu-forensics` CLI](#gpu-forensics-cli) models PyTorch's bf16 `uniform_` path exactly and reaches r ≈ 0.99999.
 - MiniMax's embedding is split into 4 shards and shard n uses seed 2760 + n.
 
-## The gpu-forensics tool
+## gpu-forensics CLI
 
-`gpu-forensics` takes a Hugging Face model URL and estimates which GPU thread layout
-initialized the model's weights. It reads only metadata and small byte ranges of
-safetensors files, never executes repository code, and reports its evidence as
+**`gpu-forensics`** is a command-line tool that applies the method above to any
+Hugging Face model. Given a model URL, it estimates which GPU thread layout
+initialized the weights. It reads only metadata and small byte ranges of
+safetensors files, never executes repository code, and classifies its evidence as
 `supported`, `weak` or `inconclusive`.
+
+Compared with the replay, which needs a recorded seed and hand-picked rows for each
+model, the CLI:
+
+- **Inspects any repository.** It pins the model to a commit and reports whether
+  analysis is feasible, flagging blockers such as quantized or pickle-only weights.
+- **Finds untrained rows automatically**, using tokenizer evidence and per-row
+  statistics.
+- **Recovers unknown seeds.** It tries metadata and known seeds, then runs an
+  exhaustive, resumable 2³² search (about 10 minutes on a 20-core CPU).
+- **Uses a broader layout model.** The launch grid is SMs × threads per SM (1024,
+  1536 or 2048). `normal_`, `uniform_` and `trunc_normal_` are reconstructed
+  exactly, including bf16 rounding, Philox offsets, tensor-parallel shards and
+  fp32 init.
+- **Validates on held-out rows** against wrong-seed and wrong-layout
+  alternatives, and writes a reproducible JSON report.
 
 ```bash
 uv sync
@@ -267,7 +276,7 @@ uv sync
 uv run pytest            # offline: golden replay of the 5 models, synthetic Hub, search, statistics
 uv run pytest -m network # live Hub checks
 uv run ruff check .
-uv run python replay.py  # original five-model replay table
+uv run python replay.py  # five-model replay table
 ```
 
 The offline tests include:
@@ -300,4 +309,4 @@ reference.
 
 ## License
 
-MIT. See `LICENSE`; the original project's copyright notice is retained.
+MIT. See `LICENSE`.
